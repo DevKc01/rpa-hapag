@@ -2,7 +2,8 @@ function (input) {
   // Extrai containers e eventos da pagina nova de Tracking da Hapag-Lloyd (Vue/Quasar).
   // Retorna JSON: { containers: [{tipo, container, status, data, local}],
   //                 eventos:    [{status, local, data, hora, transporte, viagem}] }
-  // "eventos" sao os do PRIMEIRO container (mesmo contrato do fluxo anterior).
+  // "eventos" sao os do PRIMEIRO container com numero (mesmo contrato do fluxo anterior).
+  // Booking: containers ainda nao atribuidos aparecem como "-" na tabela; sao mantidos com container "".
   // Usa textContent (nao innerText) para ler tambem os detalhes recolhidos (hora/transporte/viagem).
   var limpar = function (s) { return (s || '').replace(/\s+/g, ' ').trim(); };
   var texto = function (el) { return el ? limpar(el.textContent) : ''; };
@@ -12,6 +13,7 @@ function (input) {
   if (!tabela) { return JSON.stringify(resultado); }
 
   var padraoContainer = /^[A-Z]{4}\s?\d{6,7}$/;
+  var eventosPendentes = [];
   var linhas = Array.prototype.slice.call(tabela.querySelectorAll('tbody > tr'));
 
   var lerEventos = function (trEventos) {
@@ -34,7 +36,9 @@ function (input) {
     var tds = tr.querySelectorAll(':scope > td');
     if (tds.length < 6) { return; }
     var container = texto(tds[0]).replace(/\s+/g, '');
-    if (!padraoContainer.test(container)) { return; }
+    var pendente = (container === '-');
+    if (!pendente && !padraoContainer.test(container)) { return; }
+    if (pendente) { container = ''; }
 
     var eventos = lerEventos(tr.nextElementSibling);
     var ultimo = texto(tds[4]);
@@ -42,6 +46,7 @@ function (input) {
     var status = '';
     var local = '';
 
+    if (ultimo === '-') { ultimo = ''; }
     var m = /^(.*?)\s+on\s+(\d{4}-\d{2}-\d{2}(?:\s+\d{2}:\d{2})?)$/.exec(ultimo);
     if (m) {
       dataHora = m[2];
@@ -71,8 +76,12 @@ function (input) {
       data: dataHora,
       local: local
     });
-    if (resultado.eventos.length === 0 && eventos.length > 0) { resultado.eventos = eventos; }
+    if (eventos.length > 0) {
+      if (!container && !eventosPendentes.length) { eventosPendentes = eventos; }
+      if (container && !resultado.eventos.length) { resultado.eventos = eventos; }
+    }
   });
+  if (!resultado.eventos.length) { resultado.eventos = eventosPendentes; }
 
   return JSON.stringify(resultado);
 }
