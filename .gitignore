@@ -1,0 +1,7 @@
+.local/
+.objects/
+.screenshots/
+.settings/
+.vs/
+*.nupkg
+*.log
